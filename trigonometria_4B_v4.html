@@ -1,0 +1,92 @@
+<!doctype html><html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Circonferenza goniometrica — 4B</title><style>
+:root{--ink:#182337;--muted:#526078;--panel:#ffffff;--line:#dce3ee;--axis:#748196;--sin:#c34254;--cos:#197a88;--blue:#243b62;--orange:#c9962a;--orange-soft:#f4df9b;--orange-line:rgba(201,150,42,.34);--orange-line-graph:rgba(201,150,42,.42)}
+body{font-family:system-ui,-apple-system,sans-serif;background:#f7f9fc;color:var(--ink);margin:0;padding:18px}h1{font-size:23px;margin:0 0 8px}.intro{margin:0 0 16px;color:var(--muted)}.layout{display:grid;grid-template-columns:minmax(310px,1fr) minmax(360px,1.25fr);gap:18px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:15px;box-shadow:0 2px 10px #14213d0a}.right{display:grid;gap:16px}.head{font-weight:700;margin-bottom:7px}.plot{width:100%;height:auto;touch-action:none;display:block}.controls{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:14px}button{border:0;border-radius:9px;padding:10px 17px;background:var(--blue);color:white;font-weight:600;cursor:pointer}input[type=range]{flex:1;min-width:150px;accent-color:#304e7a}.values{display:flex;gap:20px;flex-wrap:wrap;font-size:17px;margin-top:12px}.angle-value{color:var(--orange)}.sin{color:var(--sin)}.cos{color:var(--cos)}.small{color:#69758a;font-size:13px;margin-top:8px}.legend{display:flex;gap:12px;flex-wrap:wrap;color:#69758a;font-size:13px;margin-top:8px}.badge{display:inline-flex;align-items:center;gap:6px}.swatch{display:inline-block;width:18px;height:10px;border-radius:4px;background:var(--orange-soft);border:1px solid #d6ba67}@media(max-width:800px){.layout{grid-template-columns:1fr}.right{grid-template-columns:1fr}}</style></head><body><h1>Dal moto sulla circonferenza ai grafici di seno e coseno</h1><p class="intro">Trascina il punto P sulla circonferenza, oppure usa il cursore. I due grafici sono distinti e sincronizzati.</p><div class="layout"><section class="panel"><div class="head">Circonferenza goniometrica</div><svg id="circle" class="plot" viewBox="0 0 440 440" aria-label="Circonferenza goniometrica con punto trascinabile"></svg><div class="values"><span class="angle-value" id="angle"></span><span class="sin" id="sv"></span><span class="cos" id="cv"></span></div><div class="small">Rosso: seno (ordinata). Verde petrolio: coseno (ascissa).</div><div class="legend"><span class="badge"><i class="swatch"></i>arco dell'angolo e segmento corrispondente sull'asse x</span></div></section><div class="right"><section class="panel"><div class="head sin">Grafico di y = sin(x)</div><svg id="sine" class="plot" viewBox="0 0 560 225"></svg></section><section class="panel"><div class="head cos">Grafico di y = cos(x)</div><svg id="cosine" class="plot" viewBox="0 0 560 225"></svg></section></div></div><div class="panel controls"><button id="play">▶ Avvia</button><button id="reset">↺ Reimposta</button><label for="slider">Angolo</label><input id="slider" type="range" min="0" max="360" step="0.1" value="45"><strong id="degrees">45°</strong></div><script>
+const NS='http://www.w3.org/2000/svg',pi=Math.PI;
+let deg=45,playing=false,last=0;
+const C=document.getElementById('circle'),S=document.getElementById('sine'),K=document.getElementById('cosine');
+function el(tag,attrs,parent,text){let n=document.createElementNS(NS,tag);for(let [k,v] of Object.entries(attrs||{}))n.setAttribute(k,v);if(text!==undefined)n.textContent=text;(parent||C).appendChild(n);return n}
+function line(parent,x1,y1,x2,y2,color='#d8deea',w=1,dash=''){return el('line',{x1,y1,x2,y2,stroke:color,'stroke-width':w,'stroke-dasharray':dash},parent)}
+function txt(parent,x,y,t,color='#536078',size=14,anchor='middle',weight='400'){return el('text',{x,y,fill:color,'font-size':size,'text-anchor':anchor,'font-family':'system-ui','font-weight':weight},parent,t)}
+function fmt(v){return (Math.abs(v)<0.0005?0:v).toFixed(3)}
+function drawCircle(){
+  C.replaceChildren();
+  let cx=220,cy=220,r=160,a=deg*pi/180,px=cx+r*Math.cos(a),py=cy-r*Math.sin(a);
+  line(C,25,cy,415,cy,'#748196',1.5); line(C,cx,25,cx,415,'#748196',1.5);
+  el('circle',{cx,cy,r,fill:'none',stroke:'#304e7a','stroke-width':2.5},C);
+
+  // angle arc (real angle from (1,0) to P), now lighter and overlapping the circumference
+  const arcR=r,startX=cx+arcR,startY=cy,endX=cx+arcR*Math.cos(a),endY=cy-arcR*Math.sin(a),laf=deg>180?1:0;
+  el('path',{d:`M ${startX} ${startY} A ${arcR} ${arcR} 0 ${laf} 0 ${endX} ${endY}`,fill:'none',stroke:'var(--orange-line)','stroke-width':5.5,'stroke-linecap':'round'},C);
+
+  // cardinal points
+  const cardinals=[
+    {x:cx+r,y:cy,coord:'(1,0)',dx:24,dy:24,anchor:'start'},
+    {x:cx,y:cy-r,coord:'(0,1)',dx:-26,dy:-12,anchor:'end'},
+    {x:cx-r,y:cy,coord:'(-1,0)',dx:-24,dy:24,anchor:'end'},
+    {x:cx,y:cy+r,coord:'(0,-1)',dx:-28,dy:24,anchor:'end'}
+  ];
+  for(const p of cardinals){
+    el('circle',{cx:p.x,cy:p.y,r:4.5,fill:'#304e7a'},C);
+    txt(C,p.x+p.dx,p.y+p.dy,p.coord,'#445268',13,p.anchor,'600');
+  }
+
+  // angle labels, kept on the circumference but separated from coordinates
+  const angleLabels={
+    0:{label:'0',dx:18,dy:-14,anchor:'start'},
+    90:{label:'π/2',dx:18,dy:-10,anchor:'start'},
+    180:{label:'π',dx:-18,dy:-14,anchor:'end'},
+    270:{label:'3π/2',dx:18,dy:26,anchor:'start'}
+  };
+  for(let d of [0,90,180,270]){
+    let q=d*pi/180, info=angleLabels[d];
+    txt(C,cx+r*Math.cos(q)+info.dx,cy-r*Math.sin(q)+info.dy,info.label,'#c9962a',15,info.anchor,'700');
+  }
+
+  txt(C,414,cy-10,'x'); txt(C,cx+12,24,'y');
+  line(C,cx,cy,px,py,'#394963',2.2);
+  line(C,px,py,px,cy,'#c34254',4);
+  line(C,cx,cy,px,cy,'#197a88',4);
+  el('circle',{cx:px,cy:py,r:9,fill:'#263d67',stroke:'white','stroke-width':3},C);
+  txt(C,px+(px>=cx?17:-17),py-14,'P','#263d67',17,'middle','700');
+  el('circle',{cx:px,cy:cy,r:5,fill:'#197a88'},C);
+  el('circle',{cx:cx,cy:py,r:5,fill:'#c34254'},C);
+  line(C,cx,py,px,py,'#c34254',1,'4 4');
+  txt(C,cx+8,cy+17,'O','#536078',13,'start');
+}
+function drawGraph(svg,fn,color){
+  svg.replaceChildren();
+  let l=49,r=542,t=18,b=190,w=r-l,h=b-t,X=x=>l+x/(2*pi)*w,Y=y=>t+(1.25-y)/2.5*h;
+  for(let v of [-1,0,1]){line(svg,l,Y(v),r,Y(v),v===0?'#77849a':'#e1e7ef',v===0?1.5:1);txt(svg,l-12,Y(v)+5,String(v),'#617087',13,'end')}
+  for(let i=0;i<=4;i++){let x=i*pi/2;line(svg,X(x),t,X(x),b,'#e9edf3');txt(svg,X(x),b+23,['0','π/2','π','3π/2','2π'][i],'#617087',13)}
+  let a=deg*pi/180,currentX=X(a);
+  // highlight segment on x-axis from 0 to current angle
+  const x0=X(0),axisY=Y(0);
+  el('line',{x1:x0,y1:axisY,x2:currentX,y2:axisY,stroke:'var(--orange-line-graph)','stroke-width':5,'stroke-linecap':'round'},svg);
+  let d=''; for(let i=0;i<=500;i++){let x=2*pi*i/500;d+=(i?'L':'M')+X(x).toFixed(2)+' '+Y(fn(x)).toFixed(2)+' '}
+  el('path',{d,fill:'none',stroke:color,'stroke-width':3.2,'stroke-linecap':'round'},svg);
+  let y=Y(fn(a));
+  line(svg,currentX,t,currentX,b,'#8b98aa',1.5,'5 4');
+  line(svg,l,y,currentX,y,color,1.5,'5 4');
+  el('circle',{cx:currentX,cy:y,r:7,fill:color,stroke:'white','stroke-width':2.5},svg)
+}
+function update(){
+  drawCircle(); drawGraph(S,Math.sin,'#c34254'); drawGraph(K,Math.cos,'#197a88');
+  let a=deg*pi/180;
+  document.getElementById('angle').textContent='x = '+fmt(a)+' rad';
+  document.getElementById('sv').textContent='sin(x) = '+fmt(Math.sin(a));
+  document.getElementById('cv').textContent='cos(x) = '+fmt(Math.cos(a));
+  document.getElementById('degrees').textContent=deg.toFixed(1)+'°';
+  document.getElementById('slider').value=deg;
+}
+function setDeg(v){deg=((v%360)+360)%360;update()}
+let drag=false;
+function point(e){let rect=C.getBoundingClientRect(),x=(e.clientX-rect.left)*440/rect.width-220,y=220-(e.clientY-rect.top)*440/rect.height;setDeg(Math.atan2(y,x)*180/pi)}
+C.addEventListener('pointerdown',e=>{drag=true;C.setPointerCapture(e.pointerId);point(e)});
+C.addEventListener('pointermove',e=>{if(drag)point(e)});
+C.addEventListener('pointerup',()=>drag=false); C.addEventListener('pointercancel',()=>drag=false);
+document.getElementById('slider').addEventListener('input',e=>setDeg(+e.target.value));
+document.getElementById('reset').onclick=()=>{playing=false;document.getElementById('play').textContent='▶ Avvia';setDeg(45)};
+document.getElementById('play').onclick=()=>{playing=!playing;document.getElementById('play').textContent=playing?'⏸ Pausa':'▶ Avvia';last=0;if(playing)requestAnimationFrame(tick)};
+function tick(t){if(!playing)return; if(last)setDeg(deg+(t-last)*0.025); last=t; requestAnimationFrame(tick)}
+update();
+</script></body></html>
