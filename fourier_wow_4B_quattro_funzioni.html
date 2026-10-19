@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fourier WOW – 4B</title>
+<style>
+  :root{
+    --bg1:#07111f; --bg2:#0d1930; --panel:#101c32; --panel2:#13223c; --line:#2c3e60;
+    --text:#eaf1ff; --muted:#9db0d1; --gold:#ffd166; --cyan:#67e8f9; --pink:#ff7aa2; --green:#7de2b8;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    background:radial-gradient(circle at 20% 20%, #122445 0%, var(--bg1) 45%, #050b16 100%);
+    color:var(--text); padding:18px;
+  }
+  main{max-width:1280px;margin:auto}
+  h1{margin:0 0 6px;font-size:31px;letter-spacing:.3px}
+  .sub{margin:0 0 14px;color:var(--muted);font-size:15px;line-height:1.35}
+  .panel{background:linear-gradient(180deg, rgba(16,28,50,.92), rgba(10,18,32,.96)); border:1px solid rgba(120,150,210,.18); border-radius:18px; box-shadow:0 18px 40px rgba(0,0,0,.28); overflow:hidden}
+  .controls{display:grid;grid-template-columns:repeat(6,max-content) 1fr;gap:14px;align-items:center;padding:15px 18px;border-bottom:1px solid rgba(120,150,210,.16)}
+  .controls label{font-weight:700;color:#d9e4fa}
+  .controls select,.controls input[type=range],button{font:inherit}
+  .controls select,.controls .pill{background:#182846;color:#f5f8ff;border:1px solid #2f4773;border-radius:10px;padding:9px 12px}
+  .controls input[type=range]{accent-color:#ffd166;min-width:180px}
+  button{background:linear-gradient(180deg,#ffd166,#f8b941);color:#342100;border:0;border-radius:10px;padding:10px 14px;font-weight:800;cursor:pointer;box-shadow:0 6px 15px rgba(255,209,102,.22)}
+  button.secondary{background:linear-gradient(180deg,#1b2d4d,#15243d);color:#eaf1ff;border:1px solid #38507c;box-shadow:none}
+  .readouts{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap}
+  .pill{display:inline-flex;align-items:center;gap:8px}
+  .pill b{color:var(--gold)}
+  canvas{display:block;width:100%;height:auto;background:linear-gradient(180deg,rgba(10,16,30,.28),rgba(2,7,16,.38))}
+  .footer{display:grid;grid-template-columns:1.2fr .8fr;gap:14px;padding:14px 18px;border-top:1px solid rgba(120,150,210,.16)}
+  .box{background:rgba(255,255,255,.035);border:1px solid rgba(120,150,210,.12);border-radius:14px;padding:12px 14px}
+  .box h2{margin:0 0 7px;font-size:15px;color:#f7fbff}
+  .box p{margin:0;color:var(--muted);font-size:14px;line-height:1.45}
+  .formula{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:#fff3c4;font-size:14px;white-space:pre-wrap}
+  @media (max-width:980px){
+    .controls{grid-template-columns:1fr 1fr;justify-items:start}
+    .readouts{justify-content:flex-start}
+    .footer{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Perché studiare seno e coseno? Guarda cosa sanno fare.</h1>
+  <p class="sub">Una funzione apparentemente “complicata” può essere ricostruita sommando funzioni goniometriche. A sinistra gli <strong>epicicli</strong>; a destra il grafico che nasce. Più armoniche aggiungi, più l'approssimazione migliora.</p>
+
+  <section class="panel">
+    <div class="controls">
+      <label for="wave">Funzione</label>
+      <select id="wave">
+        <option value="square">Onda quadra</option>
+        <option value="saw">Dente di sega</option>
+        <option value="triangle">Onda triangolare</option>
+        <option value="mystery">Onda misteriosa ✨</option>
+      </select>
+
+      <label for="terms">Armoniche</label>
+      <input id="terms" type="range" min="1" max="18" step="1" value="5">
+
+      <button id="play">⏸ Pausa</button>
+      <button id="demo" class="secondary">✨ Demo automatica</button>
+
+      <div class="readouts">
+        <span class="pill"><b id="termsValue">5</b> termini</span>
+        <span class="pill">errore medio: <b id="errorValue">0,000</b></span>
+        <span class="pill">fase: <b id="phaseValue">0,00π</b></span>
+      </div>
+    </div>
+
+    <div id="runtimeStatus" style="color:#ffd166;padding:0 18px" role="status"></div>
+    <canvas id="cv" width="1240" height="680" aria-label="Animazione della serie di Fourier con epicicli e grafico"></canvas>
+
+    <div class="footer">
+      <div class="box">
+        <h2>Somma attuale</h2>
+        <div class="formula" id="formula"></div>
+      </div>
+      <div class="box">
+        <h2>Idea chiave per la classe</h2>
+        <p>Le funzioni goniometriche non servono solo nei triangoli: sono i <strong>mattoni fondamentali</strong> con cui si possono descrivere e approssimare segnali, onde, suoni e grafici complessi. È il motivo per cui seno e coseno compaiono ovunque in fisica, musica, elettronica e tecnologia.</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+(() => {
+  const canvas = document.getElementById('cv');
+  const ctx = canvas.getContext('2d');
+  const TAU = Math.PI * 2;
+
+  const waveSel = document.getElementById('wave');
+  const termsSlider = document.getElementById('terms');
+  const playBtn = document.getElementById('play');
+  const demoBtn = document.getElementById('demo');
+  const termsValue = document.getElementById('termsValue');
+  const errorValue = document.getElementById('errorValue');
+  const phaseValue = document.getElementById('phaseValue');
+  const formulaEl = document.getElementById('formula');
+
+  let playing = true;
+  let t = 0;
+  let lastTime = 0;
+  let speed = 0.32;          // cycles per second across one period
+  let trace = [];
+  let demoMode = false;
+  let demoTimer = 0;
+  let frameCount=0;
+  let cachedCoeffs = [];
+  let cachedType = '';
+  let cachedN = 0;
+  let errorCache = 0;
+  function syncCoeffs(){
+    const type = waveSel.value, n = +termsSlider.value;
+    if(type !== cachedType || n !== cachedN){
+      cachedType = type; cachedN = n;
+      cachedCoeffs = getCoefficients(type,n);
+      errorCache = computeError(type,n);
+      resetTrace();
+    }
+  }
+
+  const theme = {
+    bgGrid: 'rgba(156,188,255,.08)',
+    axis: 'rgba(181,200,234,.45)',
+    circle: 'rgba(103,232,249,.24)',
+    vector: '#ffd166',
+    endpoint: '#ffd166',
+    target: 'rgba(103,232,249,.75)',
+    approx: '#ff7aa2',
+    trace: '#ffd166',
+    connector: 'rgba(255,209,102,.35)',
+    text: '#ecf3ff',
+    muted: '#93a8cc',
+    box: 'rgba(15,25,43,.82)',
+    green: '#7de2b8'
+  };
+
+  // A deliberately irregular periodic signal with 18 sine harmonics.
+  // The target is the exact 18-term function; the slider reveals its partial sums.
+  const MYSTERY_AMPS = [0.48, -0.25, 0.33, 0.11, -0.23, 0.19,
+                        -0.12, 0.15, -0.11, 0.09, -0.075, 0.065,
+                        0.05, -0.045, 0.038, -0.03, 0.023, -0.018];
+  function mysteryValue(x){
+    let sum = 0;
+    for(let k=0;k<MYSTERY_AMPS.length;k++) sum += MYSTERY_AMPS[k]*Math.sin((k+1)*x);
+    return sum;
+  }
+
+  function getCoefficients(type, nTerms){
+    const arr = [];
+    if(type === 'square'){
+      for(let k=0; k<nTerms; k++){
+        const n = 2*k + 1;
+        arr.push({amp: 4/(Math.PI*n), freq:n, phase:0, label:`${k===0?'': ' + '}4/(${n}π)·sin(${n}x)`});
+      }
+    } else if(type === 'saw'){
+      for(let n=1; n<=nTerms; n++){
+        const sign = (n % 2 === 0) ? -1 : 1;
+        arr.push({amp: sign * 2/(Math.PI*n), freq:n, phase:0, label:`${n===1?'': (sign>0?' + ':' - ')}2/(${n}π)·sin(${n}x)`});
+      }
+    } else if(type === 'triangle'){
+      for(let k=0; k<nTerms; k++){
+        const n = 2*k + 1;
+        const sign = (k % 2 === 0) ? 1 : -1;
+        arr.push({amp: sign * 8/(Math.PI*Math.PI*n*n), freq:n, phase:0, label:`${k===0?'': (sign>0?' + ':' - ')}8/(π²·${n}²)·sin(${n}x)`});
+      }
+    } else if(type === 'mystery'){
+      for(let n=1;n<=nTerms;n++){
+        const amp = MYSTERY_AMPS[n-1];
+        arr.push({amp, freq:n, phase:0});
+      }
+    }
+    return arr;
+  }
+
+  function targetValue(type, x){
+    if(type === 'mystery') return mysteryValue(x);
+    if(type === 'square') return Math.sin(x) >= 0 ? 1 : -1;
+    if(type === 'saw'){
+      const y = ((x + Math.PI) % TAU + TAU) % TAU - Math.PI;
+      return y / Math.PI;
+    }
+    return (2/Math.PI) * Math.asin(Math.sin(x));
+  }
+
+  function approxValue(type, x, nTerms){
+    let sum = 0;
+    const coeffs = (type === cachedType && nTerms === cachedN) ? cachedCoeffs : getCoefficients(type,nTerms);
+    for(const c of coeffs) sum += c.amp * Math.sin(c.freq*x + c.phase);
+    return sum;
+  }
+
+  function computeError(type, nTerms){
+    let e = 0, N=700;
+    for(let i=0; i<N; i++){
+      const x = TAU*i/N;
+      e += Math.abs(targetValue(type,x)-approxValue(type,x,nTerms));
+    }
+    return e/N;
+  }
+
+  function updateReadouts(){
+    const type = waveSel.value;
+    const nTerms = +termsSlider.value;
+    syncCoeffs();
+    termsValue.textContent = nTerms;
+    errorValue.textContent = errorCache.toFixed(3).replace('.',',');
+    phaseValue.textContent = (t/Math.PI).toFixed(2).replace('.',',') + 'π';
+    const coeffs = cachedCoeffs;
+    const preview = coeffs.slice(0, 6).map((c,i)=>{
+      const abs = Math.abs(c.amp);
+      const sign = i===0 ? (c.amp<0?'-':'') : (c.amp<0?' - ':' + ');
+      const coef = abs.toFixed(3).replace('.',',');
+      return `${sign}${coef}·sin(${c.freq}x)`;
+    }).join('');
+    const tail = coeffs.length>6 ? ' + …' : '';
+    const name = type==='square' ? 'onda quadra' : type==='saw' ? 'dente di sega' : type==='triangle' ? 'onda triangolare' : 'onda misteriosa (18 armoniche)';
+    formulaEl.textContent = `${name}:\nfₙ(x) ≈ ${preview}${tail}`;
+  }
+
+  function resetTrace(){ trace = []; }
+
+  function drawGrid(x,y,w,h,stepX,stepY){
+    ctx.save();
+    ctx.strokeStyle = theme.bgGrid;
+    ctx.lineWidth = 1;
+    for(let xx=x; xx<=x+w+.5; xx+=stepX){ ctx.beginPath(); ctx.moveTo(xx,y); ctx.lineTo(xx,y+h); ctx.stroke(); }
+    for(let yy=y; yy<=y+h+.5; yy+=stepY){ ctx.beginPath(); ctx.moveTo(x,yy); ctx.lineTo(x+w,yy); ctx.stroke(); }
+    ctx.restore();
+  }
+
+  function roundedRect(x,y,w,h,r){
+    ctx.beginPath();
+    ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r);
+    ctx.closePath();
+  }
+
+  function drawScene(){
+    const W = canvas.width, H = canvas.height;
+    ctx.clearRect(0,0,W,H);
+
+    // Layout
+    const epiBox = {x:28, y:26, w:420, h:628};
+    const graphBox = {x:474, y:26, w:738, h:628};
+    const centerX = epiBox.x + epiBox.w * 0.42;
+    const centerY = epiBox.y + epiBox.h * 0.52;
+    const scale = 120;
+    const graphPad = 56;
+    const gx = graphBox.x + graphPad;
+    const gy = graphBox.y + 62;
+    const gw = graphBox.w - graphPad - 28;
+    const gh = graphBox.h - 122;
+    const xMap = x => gx + (x/TAU) * gw;
+    const yMap = y => gy + gh/2 - y * gh * 0.39;
+
+    // panels inside canvas
+    ctx.fillStyle = 'rgba(14,22,39,.62)';
+    ctx.strokeStyle = 'rgba(120,150,210,.13)';
+    ctx.lineWidth = 1.2;
+    roundedRect(epiBox.x, epiBox.y, epiBox.w, epiBox.h, 20); ctx.fill(); ctx.stroke();
+    roundedRect(graphBox.x, graphBox.y, graphBox.w, graphBox.h, 20); ctx.fill(); ctx.stroke();
+
+    // Titles
+    ctx.fillStyle = theme.text; ctx.font = '700 21px system-ui';
+    ctx.fillText('Epicicli', epiBox.x+22, epiBox.y+34);
+    ctx.fillText('Approssimazione della funzione', graphBox.x+22, graphBox.y+34);
+    ctx.fillStyle = theme.muted; ctx.font = '14px system-ui';
+    ctx.fillText('Ogni cerchio aggiunge una nuova armonica.', epiBox.x+22, epiBox.y+57);
+    ctx.fillText('Azzurro = funzione bersaglio · Rosa = somma delle armoniche', graphBox.x+22, graphBox.y+57);
+
+    // graph grid and axes
+    drawGrid(gx, gy, gw, gh, gw/8, gh/8);
+    ctx.strokeStyle = theme.axis; ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.moveTo(gx, yMap(0)); ctx.lineTo(gx+gw, yMap(0)); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(gx, gy); ctx.lineTo(gx, gy+gh); ctx.stroke();
+    const labels = ['0','π/2','π','3π/2','2π'];
+    [0,0.5,1,1.5,2].forEach((u,i)=>{
+      const xx = xMap(u*Math.PI);
+      ctx.strokeStyle = 'rgba(170,190,225,.18)';
+      ctx.beginPath(); ctx.moveTo(xx, gy); ctx.lineTo(xx, gy+gh); ctx.stroke();
+      ctx.fillStyle = theme.muted; ctx.font = '13px system-ui'; ctx.textAlign = 'center';
+      ctx.fillText(labels[i], xx, gy+gh+23);
+    });
+    [-1,0,1].forEach(v=>{
+      const yy = yMap(v);
+      ctx.fillStyle = theme.muted; ctx.textAlign='right'; ctx.fillText(String(v), gx-10, yy+4);
+    });
+    ctx.textAlign='left';
+
+    // target and approx full curves
+    const type = waveSel.value;
+    const nTerms = +termsSlider.value;
+
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = theme.target;
+    ctx.beginPath();
+    for(let i=0;i<=480;i++){
+      const x = TAU*i/480;
+      const px = xMap(x), py = yMap(targetValue(type, x));
+      if(i===0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+
+    ctx.strokeStyle = theme.approx;
+    ctx.lineWidth = 3.2;
+    ctx.beginPath();
+    for(let i=0;i<=480;i++){
+      const x = TAU*i/480;
+      const px = xMap(x), py = yMap(approxValue(type, x, nTerms));
+      if(i===0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+
+    // epicycles
+    let x = centerX, y = centerY;
+    const coeffs = cachedCoeffs;
+    coeffs.forEach((c, idx)=>{
+      const r = Math.abs(c.amp) * scale;
+      const ang = c.freq * t + (c.amp >= 0 ? 0 : Math.PI);
+      ctx.strokeStyle = theme.circle; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.stroke();
+      const nx = x + r * Math.cos(ang);
+      const ny = y + r * Math.sin(ang);
+      ctx.strokeStyle = idx===0 ? '#ffe29a' : theme.vector; ctx.lineWidth = 2.4;
+      ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(nx,ny); ctx.stroke();
+      ctx.fillStyle = 'rgba(255,209,102,.85)'; ctx.beginPath(); ctx.arc(nx, ny, 3.2, 0, TAU); ctx.fill();
+      x = nx; y = ny;
+    });
+
+    // center axes and endpoint highlights
+    ctx.strokeStyle = 'rgba(180,205,245,.20)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(epiBox.x+18, centerY); ctx.lineTo(epiBox.x+epiBox.w-18, centerY); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(centerX, epiBox.y+72); ctx.lineTo(centerX, epiBox.y+epiBox.h-20); ctx.stroke();
+    ctx.fillStyle = theme.endpoint;
+    ctx.beginPath(); ctx.arc(x, y, 6.8, 0, TAU); ctx.fill();
+    ctx.shadowColor = 'rgba(255,209,102,.5)'; ctx.shadowBlur = 14;
+    ctx.beginPath(); ctx.arc(x, y, 3.2, 0, TAU); ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // current graph point + connector
+    const currentVal = approxValue(type, t, nTerms);
+    const gxNow = xMap(t), gyNow = yMap(currentVal);
+    ctx.strokeStyle = theme.connector; ctx.lineWidth = 1.5; ctx.setLineDash([7,7]);
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(gxNow, y); ctx.lineTo(gxNow, gyNow); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // trace of current run
+    trace.push({x:gxNow, y:gyNow, t});
+    if(trace.length > 1200) trace.shift();
+    ctx.strokeStyle = theme.trace; ctx.lineWidth = 3.2;
+    ctx.beginPath();
+    trace.forEach((p,i)=>{ if(i===0) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y); });
+    ctx.stroke();
+
+    // moving point on approx curve
+    ctx.fillStyle = theme.trace;
+    ctx.beginPath(); ctx.arc(gxNow, gyNow, 7.5, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#08111d'; ctx.beginPath(); ctx.arc(gxNow, gyNow, 3.1, 0, TAU); ctx.fill();
+
+    // time cursor
+    ctx.strokeStyle = 'rgba(255,255,255,.15)'; ctx.lineWidth = 1.1;
+    ctx.beginPath(); ctx.moveTo(gxNow, gy); ctx.lineTo(gxNow, gy+gh); ctx.stroke();
+
+    // mini caption around endpoint
+    ctx.fillStyle = theme.green; ctx.font = '700 13px system-ui';
+    ctx.fillText('somma finale', x+12, y-12);
+
+    // bottom hints inside graph
+    ctx.fillStyle = '#ffd166'; ctx.font = '700 17px system-ui';
+    ctx.fillText('Più armoniche → più precisione', graphBox.x+24, graphBox.y+graphBox.h-18);
+
+    // term badges in epicycle box
+    ctx.font = '13px system-ui';
+    ctx.fillStyle = theme.muted;
+    const txt1 = type==='square' ? 'armoniche dispari' : type==='triangle' ? 'armoniche dispari con ampiezza che cala come 1/n²' : type==='mystery' ? '18 armoniche: un profilo sempre più ricco' : 'armoniche tutte presenti';
+    ctx.fillText(txt1, epiBox.x+22, epiBox.y+83);
+    ctx.fillStyle = theme.text;
+    ctx.fillText(`N = ${nTerms}`, epiBox.x+22, epiBox.y+108);
+  }
+
+  function frame(ts){
+    if(!lastTime) lastTime = ts;
+    const dt = Math.min((ts-lastTime)/1000, 0.05);
+    lastTime = ts;
+
+    if(playing){
+      t += TAU * speed * dt;
+      if(t >= TAU){
+        t -= TAU;
+        resetTrace();
+      }
+    }
+
+    if(demoMode){
+      demoTimer += dt;
+      if(demoTimer > 1.7){
+        demoTimer = 0;
+        const max = +termsSlider.max;
+        let v = +termsSlider.value;
+        v = v < max ? v+1 : 1;
+        termsSlider.value = v;
+        updateReadouts();
+      }
+    }
+
+    if(++frameCount % 2 === 0) updateReadouts();
+    try { drawScene(); } catch (err) {
+      console.error('Errore grafico:', err);
+      document.getElementById('runtimeStatus').textContent = 'Errore nella visualizzazione: ' + err.message;
+      return;
+    }
+    requestAnimationFrame(frame);
+  }
+
+  function softReset(){ t = 0; resetTrace(); lastTime = 0; }
+
+  waveSel.addEventListener('change', ()=>{ softReset(); updateReadouts(); });
+  termsSlider.addEventListener('input', ()=>{ updateReadouts(); });
+  termsSlider.addEventListener('change', ()=>{ softReset(); });
+  playBtn.addEventListener('click', ()=>{
+    playing = !playing;
+    playBtn.textContent = playing ? '⏸ Pausa' : '▶ Avvia';
+  });
+  demoBtn.addEventListener('click', ()=>{
+    demoMode = !demoMode;
+    demoBtn.textContent = demoMode ? '⏹ Ferma demo' : '✨ Demo automatica';
+  });
+
+  updateReadouts();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
