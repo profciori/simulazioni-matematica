@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Trigonometria 4B — Tangente e cotangente</title>
+<style>
+:root{--ink:#182337;--muted:#59677e;--tan:#c34254;--cot:#197a88;--angle:#c9962a;--angleTint:rgba(201,150,42,.28);--panel:#fff;--border:#dce3ee}
+*{box-sizing:border-box}body{font-family:system-ui,-apple-system,sans-serif;background:#f7f9fc;color:var(--ink);margin:0;padding:18px}main{max-width:1450px;margin:auto}h1{font-size:clamp(21px,2.2vw,27px);margin:0 0 7px}.intro{margin:0 0 16px;color:var(--muted);font-size:15px}.layout{display:grid;grid-template-columns:minmax(360px,1.1fr) minmax(420px,1.25fr);gap:17px}.panel{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:14px;box-shadow:0 3px 12px #14213d0a}.right{display:grid;gap:14px}.head{font-weight:750;margin:0 0 8px}.tan{color:var(--tan)}.cot{color:var(--cot)}.circle{width:100%;height:auto;display:block;touch-action:none;user-select:none;cursor:grab}.circle:active{cursor:grabbing}.plot{width:100%;height:auto;display:block}.readouts{display:flex;gap:10px 22px;flex-wrap:wrap;font-size:16px;margin-top:8px;font-weight:600}.angle{color:var(--angle)}.hint{font-size:13px;color:#64738a;margin:8px 0 0;line-height:1.45}.controls{margin-top:15px;padding:15px}.sliderline{display:flex;gap:14px;align-items:center;flex-wrap:wrap}.sliderline input{flex:1;min-width:160px;accent-color:#274b78}.buttons{display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin-top:13px}button{border:none;border-radius:9px;padding:10px 16px;font:inherit;font-weight:700;color:white;background:#243b62;cursor:pointer}button.secondary{background:#e8eef7;color:#243b62}select{font:inherit;padding:8px;border:1px solid #ccd7e5;border-radius:9px;background:white}.note{color:#536078;font-size:13px;margin:12px 2px}.key{font-weight:700}svg text{font-family:system-ui,-apple-system,sans-serif}@media(max-width:880px){.layout{grid-template-columns:1fr}.panel{padding:12px}}
+</style></head><body><main><h1>Dal moto sulla circonferenza ai grafici di tangente e cotangente</h1><p class="intro">Trascina il punto <strong>P</strong> sulla circonferenza o sposta il cursore: osserva le intersezioni con le rette tangenti e i due grafici sincronizzati.</p>
+<div class="layout"><section class="panel"><div class="head">Circonferenza goniometrica</div><svg id="circle" class="circle" viewBox="0 0 560 530" role="img" aria-label="Circonferenza goniometrica interattiva con tangente, cotangente e angolo"></svg><div class="readouts"><span class="angle" id="angleValue">x = 0,000 rad</span><span class="tan" id="tanValue">tg(x) = 0,000</span><span class="cot" id="cotValue">cotg(x) = non definita</span></div><p class="hint"><span class="tan key">Rosso</span>: tangente sulla retta <strong>u = 1</strong>. <span class="cot key">Verde petrolio</span>: cotangente sulla retta <strong>v = 1</strong>. Le proiezioni sono ottenute prolungando la retta OP.</p></section>
+<div class="right"><section class="panel"><div class="head tan">Funzione tangente · y = tg(x)</div><svg id="tanChart" class="plot" viewBox="0 0 650 256" role="img" aria-label="Grafico della tangente con asintoti e punto mobile"></svg></section><section class="panel"><div class="head cot">Funzione cotangente · y = cotg(x)</div><svg id="cotChart" class="plot" viewBox="0 0 650 256" role="img" aria-label="Grafico della cotangente con asintoti e punto mobile"></svg></section></div></div>
+<section class="panel controls"><div class="sliderline"><label for="slider"><strong>Angolo x</strong></label><input type="range" id="slider" min="0" max="360" step="0.1" value="45" aria-label="Angolo da zero a 360 gradi"><strong id="degrees">45,0°</strong></div><div class="buttons"><button id="play">▶ Avvia</button><button class="secondary" id="reset">↺ Reimposta</button><label for="speed">Velocità</label><select id="speed"><option value="0.65">Lenta</option><option value="1" selected>Normale</option><option value="1.6">Veloce</option></select></div><p class="hint">Le linee verticali tratteggiate indicano gli <strong>asintoti</strong>. Le curve vengono disegnate soltanto nell'intervallo visibile, senza unirsi attraverso gli asintoti. Quando una funzione non è definita compare il relativo avviso.</p></section>
+<p class="note">Le due funzioni sono periodiche di periodo <strong>π</strong>. <span class="tan key">tg(x)</span> non è definita per x = π/2 + kπ; <span class="cot key">cotg(x)</span> non è definita per x = kπ, con k intero.</p></main>
+<script>
+(()=>{'use strict';
+const NS='http://www.w3.org/2000/svg',PI=Math.PI,TAU=2*PI;let deg=45,playing=false,lastTime=null,dragging=false;
+const $=id=>document.getElementById(id),C=$('circle');
+function el(parent,name,attrs={},content){const n=document.createElementNS(NS,name);for(const [k,v] of Object.entries(attrs))n.setAttribute(k,v);if(content!==undefined)n.textContent=content;parent.appendChild(n);return n}
+function line(parent,x1,y1,x2,y2,color='#dfe6f0',width=1,dash=''){return el(parent,'line',{x1,y1,x2,y2,stroke:color,'stroke-width':width,'stroke-dasharray':dash})}
+function text(parent,x,y,value,color='#54637b',size=14,anchor='middle',weight='400'){return el(parent,'text',{x,y,fill:color,'font-size':size,'text-anchor':anchor,'font-weight':weight},value)}
+function number(n){return (Math.abs(n)<.0005?0:n).toFixed(3).replace('.',',')}
+function undef(num,den){return Math.abs(den)<1e-8}
+function arcPath(cx,cy,r,a){if(a<1e-9)return '';if(a>=TAU-1e-8)return `M ${cx+r} ${cy} A ${r} ${r} 0 1 0 ${cx-r} ${cy} A ${r} ${r} 0 1 0 ${cx+r} ${cy}`;return `M ${cx+r} ${cy} A ${r} ${r} 0 ${a>PI?1:0} 0 ${cx+r*Math.cos(a)} ${cy-r*Math.sin(a)}`}
+function circle(){C.replaceChildren();const cx=254,cy=263,r=146,a=deg*PI/180,co=Math.cos(a),si=Math.sin(a),px=cx+r*co,py=cy-r*si;
+ const minX=25,maxX=535,minY=18,maxY=508;
+ // axes and unit circle
+ line(C,minX,cy,maxX,cy,'#8290a4',1.4);line(C,cx,minY,cx,maxY,'#8290a4',1.4);
+ el(C,'circle',{cx,cy,r,fill:'none',stroke:'#304e7a','stroke-width':2.5});
+ if(a>1e-8)el(C,'path',{d:arcPath(cx,cy,r,a),fill:'none',stroke:'#c9962a','stroke-width':5,opacity:.32,'stroke-linecap':'round'});
+ // two tangent lines u=1 and v=1
+ const xt=cx+r,yt=cy-r;
+ line(C,xt,25,xt,502,'#c34254',1.8,'5 6');line(C,32,yt,530,yt,'#197a88',1.8,'5 6');
+ text(C,xt+11,27,'u = 1','#c34254',13,'start','700');text(C,510,yt-12,'v = 1','#197a88',13,'end','700');
+ // radial line and extensions, clipped to panel so endpoints never explode near asymptotes
+ const x2=cx+co*1300,y2=cy-si*1300,xb=cx-co*1300,yb=cy+si*1300;
+ const defs=el(C,'defs');const clip=el(defs,'clipPath',{id:'insideCirclePanel'});el(clip,'rect',{x:29,y:24,width:500,height:482});
+ const group=el(C,'g',{'clip-path':'url(#insideCirclePanel)'});
+ line(group,xb,yb,x2,y2,'#8193b1',1.3,'6 6');
+ // finite projections to tangent lines, accurately signed even in opposing quadrants
+ if(Math.abs(co)>1e-8){const ty=cy-r*(si/co);if(ty>=27 && ty<=503){line(C,xt,cy,xt,ty,'#c34254',5);el(C,'circle',{cx:xt,cy:ty,r:6,fill:'#c34254',stroke:'#fff','stroke-width':2});text(C,xt+10,ty-10,'T','#c34254',14,'start','700')}}
+ if(Math.abs(si)>1e-8){const tx=cx+r*(co/si);if(tx>=29 && tx<=530){line(C,cx,yt,tx,yt,'#197a88',5);el(C,'circle',{cx:tx,cy:yt,r:6,fill:'#197a88',stroke:'#fff','stroke-width':2});text(C,tx+(tx>cx?12:-12),yt-12,'C','#197a88',14,tx>cx?'start':'end','700')}}
+ line(C,cx,cy,px,py,'#304e7a',2.8);
+ el(C,'circle',{cx:px,cy:py,r:9,fill:'#304e7a',stroke:'white','stroke-width':3});
+ text(C,px+(co>0?17:-17),py+(si>0?-14:21),'P','#304e7a',17,'middle','700');
+ // cardinal positions and labels
+ const cardinal=[{xx:cx+r,yy:cy,angle:'0',coord:'(1,0)',ad:[13,-12],cd:[12,23],aa:'start',ca:'start'}, {xx:cx,yy:cy-r,angle:'π/2',coord:'(0,1)',ad:[14,-14],cd:[-13,-14],aa:'start',ca:'end'}, {xx:cx-r,yy:cy,angle:'π',coord:'(-1,0)',ad:[-12,-11],cd:[-13,23],aa:'end',ca:'end'}, {xx:cx,yy:cy+r,angle:'3π/2',coord:'(0,-1)',ad:[13,23],cd:[-12,23],aa:'start',ca:'end'}];
+ for(const p of cardinal){el(C,'circle',{cx:p.xx,cy:p.yy,r:3.7,fill:'#304e7a'});text(C,p.xx+p.ad[0],p.yy+p.ad[1],p.angle,'#c9962a',14,p.aa,'700');text(C,p.xx+p.cd[0],p.yy+p.cd[1],p.coord,'#54637b',12,p.ca,'600')}
+ text(C,526,cy-11,'u','#64748b',13);text(C,cx+12,22,'v','#64748b',13);
+ text(C,cx+9,cy+18,'O','#64748b',12,'start');
+}
+function drawChart(which){const root=$(which+'Chart');root.replaceChildren();const isTan=which==='tan',color=isTan?'#c34254':'#197a88',l=48,right=628,t=14,bottom=211,mid=112,amp=34;const X=v=>l+(right-l)*v/TAU,Y=v=>mid-amp*v;
+ for(let y of [-2,-1,0,1,2]){line(root,l,Y(y),right,Y(y),y===0?'#8996a8':'#e6ebf2',y===0?1.6:1);text(root,l-10,Y(y)+5,String(y),'#6e7b90',12,'end')}
+ for(let j=0;j<=4;j++){let xx=X(j*PI/2);line(root,xx,t,xx,bottom,'#e5eaf1',1,'3 4');text(root,xx,bottom+27,['0','π/2','π','3π/2','2π'][j],'#65738a',13)}
+ const asym=isTan?[PI/2,3*PI/2]:[0,PI,TAU];
+ for(const a of asym){const xx=X(a);line(root,xx,t,xx,bottom,color,1.6,'7 5');}
+ const segments=isTan?[[0,PI/2],[PI/2,3*PI/2],[3*PI/2,TAU]]:[[0,PI],[PI,TAU]];
+ const fn=isTan?Math.tan:v=>Math.cos(v)/Math.sin(v),limit=2.88;
+ // Clip curve at graph bounds; sample each branch separately to preserve discontinuities.
+ const defs=el(root,'defs');const clip=el(defs,'clipPath',{id:which+'Clip'});el(clip,'rect',{x:l,y:t,width:right-l,height:bottom-t});
+ const group=el(root,'g',{'clip-path':'url(#'+which+'Clip)'});
+ for(const [a,b] of segments){let path='',started=false;const n=360;for(let i=0;i<=n;i++){let u=a+(b-a)*i/n;if(asym.some(v=>Math.abs(u-v)<1e-9))continue;const value=fn(u);if(!Number.isFinite(value)||Math.abs(value)>limit){started=false;continue}path+=(started?' L':'M')+X(u).toFixed(2)+' '+Y(value).toFixed(2);started=true}if(path)el(group,'path',{d:path,fill:'none',stroke:color,'stroke-width':3.3,'stroke-linecap':'round'})}
+ const a=deg*PI/180,undefinedHere=isTan?undef(Math.sin(a),Math.cos(a)):undef(Math.cos(a),Math.sin(a));
+ // segment representing angle x on horizontal axis, matching circle highlight
+ line(root,X(0),Y(0),X(a),Y(0),'#c9962a',4.3);
+ const xx=X(a);line(root,xx,t,xx,bottom,'#718298',1.3,'4 5');
+ if(!undefinedHere){const v=fn(a);if(Math.abs(v)<=limit){line(root,l,Y(v),xx,Y(v),color,1.2,'4 5');el(root,'circle',{cx:xx,cy:Y(v),r:6.6,fill:color,stroke:'#fff','stroke-width':2.4})}else{const yy=v>0?t+7:bottom-7;el(root,'path',{d:`M ${xx-5} ${yy+(v>0?10:-10)} L ${xx} ${yy} L ${xx+5} ${yy+(v>0?10:-10)}`,fill:'none',stroke:color,'stroke-width':2.5});text(root,Math.max(60,Math.min(613,xx)),v>0?yy+27:yy-19,'oltre scala',color,12)}}else{text(root,Math.max(85,Math.min(590,xx+9)),29,'non definita',color,13,'start','700')}
+}
+function update(){circle();drawChart('tan');drawChart('cot');const a=deg*PI/180,s=Math.sin(a),c=Math.cos(a);$('angleValue').textContent='x = '+number(a)+' rad';$('tanValue').textContent='tg(x) = '+(Math.abs(c)<1e-8?'non definita':number(s/c));$('cotValue').textContent='cotg(x) = '+(Math.abs(s)<1e-8?'non definita':number(c/s));$('degrees').textContent=deg.toFixed(1).replace('.',',')+'°';$('slider').value=deg}
+function setDegree(v){deg=Math.max(0,Math.min(360,v));update()}
+function pointAngle(ev){const box=C.getBoundingClientRect();const px=(ev.clientX-box.left)*560/box.width-254,py=263-(ev.clientY-box.top)*530/box.height;return ((Math.atan2(py,px)*180/PI)%360+360)%360}
+// Pointer dragging tracks angle continuity across 0 degrees; slider permits exact 360.
+let previous=null;
+C.addEventListener('pointerdown',ev=>{stop();dragging=true;previous=pointAngle(ev);C.setPointerCapture(ev.pointerId);ev.preventDefault()});
+C.addEventListener('pointermove',ev=>{if(!dragging)return;const next=pointAngle(ev);let delta=next-previous;if(delta>180)delta-=360;if(delta< -180)delta+=360;previous=next;setDegree(deg+delta);ev.preventDefault()});
+C.addEventListener('pointerup',()=>{dragging=false;previous=null});C.addEventListener('pointercancel',()=>{dragging=false;previous=null});
+$('slider').addEventListener('input',ev=>{stop();setDegree(+ev.target.value)});
+function stop(){playing=false;lastTime=null;$('play').textContent='▶ Avvia'}
+function tick(ts){if(!playing)return;if(lastTime!==null){const dt=Math.min((ts-lastTime)/1000,.06);setDegree(deg+dt*29*Number($('speed').value))}lastTime=ts;if(deg>=360){stop();return}requestAnimationFrame(tick)}
+$('play').addEventListener('click',()=>{if(playing){stop();return}if(deg>=360)setDegree(0);playing=true;lastTime=null;$('play').textContent='Ⅱ Pausa';requestAnimationFrame(tick)});
+$('reset').addEventListener('click',()=>{stop();setDegree(45)});
+update();
+})();
+</script></body></html>
