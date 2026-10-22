@@ -1,0 +1,128 @@
+<!doctype html><html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Secante e cosecante — 4B</title><style>
+:root{--ink:#182337;--muted:#526078;--panel:#ffffff;--line:#dce3ee;--axis:#748196;--sec:#7a4cc2;--csc:#198a7b;--blue:#243b62;--orange:#c9962a;--orange-soft:#f4df9b;--orange-line:rgba(201,150,42,.34);--orange-line-graph:rgba(201,150,42,.42)}
+*{box-sizing:border-box}body{font-family:system-ui,-apple-system,sans-serif;background:#f7f9fc;color:var(--ink);margin:0;padding:18px}h1{font-size:23px;margin:0 0 8px}.intro{margin:0 0 16px;color:var(--muted)}.layout{display:grid;grid-template-columns:minmax(340px,1fr) minmax(390px,1.2fr);gap:18px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:15px;box-shadow:0 2px 10px #14213d0a}.right{display:grid;gap:16px}.head{font-weight:700;margin-bottom:7px}.plot{width:100%;height:auto;touch-action:none;display:block}.controls{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:14px}button{border:0;border-radius:9px;padding:10px 17px;background:var(--blue);color:white;font-weight:600;cursor:pointer}button.secondary{background:#eaf0f7;color:#243b62}input[type=range]{flex:1;min-width:150px;accent-color:#304e7a}.values{display:flex;gap:20px;flex-wrap:wrap;font-size:17px;margin-top:12px}.sec{color:var(--sec)}.csc{color:var(--csc)}.gold{color:var(--orange)}.small{color:#69758a;font-size:13px;margin-top:8px;line-height:1.5}.legend{display:flex;gap:12px;flex-wrap:wrap;color:#69758a;font-size:13px;margin-top:8px}.badge{display:inline-flex;align-items:center;gap:6px}.swatch{display:inline-block;width:18px;height:10px;border-radius:4px;background:var(--orange-soft);border:1px solid #d6ba67}select{font:inherit;border:1px solid #ccd6e4;border-radius:8px;padding:9px}.toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:12px}svg text{font-family:system-ui,-apple-system,sans-serif}@media(max-width:900px){.layout{grid-template-columns:1fr}.right{grid-template-columns:1fr}}</style></head><body><h1>Dal moto sulla circonferenza ai grafici di secante e cosecante</h1><p class="intro">Trascina il punto <strong>B</strong> sulla circonferenza, oppure usa il cursore. La costruzione geometrica segue il modello con la tangente in <strong>B</strong> che incontra gli assi in <strong>S</strong> e <strong>S’</strong>.</p><div class="layout"><section class="panel"><div class="head">Circonferenza goniometrica</div><svg id="circle" class="plot" viewBox="0 0 560 470" aria-label="Circonferenza goniometrica con tangente in B, punti S e S primo"></svg><div class="values"><span id="angle" class="gold"></span><span class="sec" id="secv"></span><span class="csc" id="cscv"></span></div><div class="small">Viola: <strong>OS = sec(x)</strong>. Verde petrolio: <strong>OS’ = csc(x)</strong>. Il triangolo mobile <strong>OSS’</strong> è generato dalle intersezioni della tangente in <strong>B</strong> con gli assi.</div><div class="legend"><span class="badge"><i class="swatch"></i>arco dell'angolo e segmento corrispondente sull'asse x</span></div><div class="toolbar"><label for="construction"><strong>Costruzione</strong></label><select id="construction"><option value="both">Triangolo OSS’ completo</option><option value="sec">Evidenzia secante</option><option value="csc">Evidenzia cosecante</option></select></div></section><div class="right"><section class="panel"><div class="head sec">Grafico di y = sec(x)</div><svg id="secChart" class="plot" viewBox="0 0 600 270"></svg></section><section class="panel"><div class="head csc">Grafico di y = csc(x)</div><svg id="cscChart" class="plot" viewBox="0 0 600 270"></svg></section></div></div><div class="panel controls"><button id="play">▶ Avvia</button><button id="reset" class="secondary">↺ Reimposta</button><label for="slider">Angolo</label><input id="slider" type="range" min="0" max="360" step="0.1" value="45"><strong id="degrees">45°</strong></div><script>
+const NS='http://www.w3.org/2000/svg',pi=Math.PI,TAU=2*pi;
+let deg=45,playing=false,last=0;
+const C=document.getElementById('circle'),S=document.getElementById('secChart'),K=document.getElementById('cscChart');
+function el(tag,attrs,parent,text){let n=document.createElementNS(NS,tag);for(let [k,v] of Object.entries(attrs||{}))n.setAttribute(k,v);if(text!==undefined)n.textContent=text;(parent||C).appendChild(n);return n}
+function line(parent,x1,y1,x2,y2,color='#d8deea',w=1,dash=''){return el('line',{x1,y1,x2,y2,stroke:color,'stroke-width':w,'stroke-dasharray':dash},parent)}
+function txt(parent,x,y,t,color='#536078',size=14,anchor='middle',weight='400'){return el('text',{x,y,fill:color,'font-size':size,'text-anchor':anchor,'font-family':'system-ui','font-weight':weight},parent,t)}
+function fmt(v){return (Math.abs(v)<0.0005?0:v).toFixed(3)}
+function drawCircle(){
+  C.replaceChildren();
+  let cx=255,cy=235,r=128,a=deg*pi/180,co=Math.cos(a),si=Math.sin(a),bx=cx+r*co,by=cy-r*si;
+  const mode=document.getElementById('construction').value;
+  line(C,30,cy,530,cy,'#748196',1.5); line(C,cx,30,cx,438,'#748196',1.5);
+  el('circle',{cx,cy,r,fill:'none',stroke:'#7c7c7c','stroke-width':2.2,opacity:.9},C);
+
+  if(deg>0){const laf=deg>180?1:0;el('path',{d:`M ${cx+r} ${cy} A ${r} ${r} 0 ${laf} 0 ${cx+r*Math.cos(a)} ${cy-r*Math.sin(a)}`,fill:'none',stroke:'var(--orange-line)','stroke-width':5,'stroke-linecap':'round'},C)}
+
+  // projection A of B on x-axis and right triangle OAB
+  const ax=bx, ay=cy;
+  line(C,bx,by,ax,ay,'#bfc8d6',1.2,'4 4');
+  line(C,cx,cy,bx,by,'#394963',2.4);
+  line(C,cx,cy,ax,ay,'#c9962a',3.2);
+  line(C,ax,ay,bx,by,'#a3adbb',2.2);
+  el('circle',{cx:ax,cy:ay,r:3.5,fill:'#c9962a'},C);
+  txt(C,ax,ay+24,'A','#525d6d',16,'middle','700');
+
+  // tangent at B: x*cos + y*sin = 1 in unit coords -> screen coords relative O
+  let sx=null, sy=null, sPx=null, spy=null;
+  if(Math.abs(co)>1e-8){ sx = 1/co; sPx = cx + r*sx; }
+  if(Math.abs(si)>1e-8){ sy = 1/si; spy = cy - r*sy; }
+
+  // draw full tangent line clipped to panel using intersections with bbox
+  const box={xMin:28,xMax:532,yMin:28,yMax:438};
+  const points=[];
+  if(Math.abs(si)>1e-8){ // y for x bounds
+    let yu = (1 - ((box.xMin-cx)/r)*co)/si, yv = (1 - ((box.xMax-cx)/r)*co)/si;
+    let py1=cy-r*yu, py2=cy-r*yv;
+    if(py1>=box.yMin&&py1<=box.yMax) points.push([box.xMin,py1]);
+    if(py2>=box.yMin&&py2<=box.yMax) points.push([box.xMax,py2]);
+  }
+  if(Math.abs(co)>1e-8){ // x for y bounds
+    let xu = (1 - ((cy-box.yMin)/r)*si)/co, xv = (1 - ((cy-box.yMax)/r)*si)/co;
+    let px1=cx+r*xu, px2=cx+r*xv;
+    if(px1>=box.xMin&&px1<=box.xMax) points.push([px1,box.yMin]);
+    if(px2>=box.xMin&&px2<=box.xMax) points.push([px2,box.yMax]);
+  }
+  // unique points
+  const uniq=[]; for(const p of points){ if(!uniq.some(q=>Math.hypot(q[0]-p[0],q[1]-p[1])<1)) uniq.push(p)}
+  if(uniq.length>=2) line(C,uniq[0][0],uniq[0][1],uniq[1][0],uniq[1][1],'#444',2.5);
+
+  // points and triangle OSS'
+  const O=[cx,cy], Spt=(sPx!==null?[sPx,cy]:null), Sppt=(spy!==null?[cx,spy]:null);
+  if(Spt&&Sppt){
+    // triangle OSS'
+    const fillColor= mode==='both' ? 'rgba(201,150,42,.12)' : mode==='sec' ? 'rgba(122,76,194,.10)' : 'rgba(25,138,123,.10)';
+    el('polygon',{points:`${cx},${cy} ${Spt[0]},${Spt[1]} ${Sppt[0]},${Sppt[1]}`,fill:fillColor,stroke:'none'},C);
+    line(C,cx,cy,Spt[0],Spt[1], mode==='csc'?'#c9d0db':'#7a4cc2', mode==='csc'?2.4:4.8);
+    line(C,cx,cy,Sppt[0],Sppt[1], mode==='sec'?'#c9d0db':'#198a7b', mode==='sec'?2.4:4.8);
+    line(C,Spt[0],Spt[1],Sppt[0],Sppt[1],'#444',2.5);
+    el('circle',{cx:Spt[0],cy:Spt[1],r:6,fill:'#7a4cc2',stroke:'white','stroke-width':2},C);
+    el('circle',{cx:Sppt[0],cy:Sppt[1],r:6,fill:'#198a7b',stroke:'white','stroke-width':2},C);
+    txt(C,Spt[0],Spt[1]+28,'S','#7a4cc2',18,'middle','700');
+    txt(C,Sppt[0]-14,Sppt[1]-10,"S'",'#198a7b',18,'end','700');
+    // labels on catheti
+    txt(C,(cx+Spt[0])/2,cy-10,'sec(x)', mode==='csc'?'#b0b7c2':'#7a4cc2',14,'middle','700');
+    txt(C,cx+14,(cy+Sppt[1])/2,'csc(x)', mode==='sec'?'#b0b7c2':'#198a7b',14,'start','700');
+  }
+
+  // origin, B, cardinals, axes labels
+  el('circle',{cx:bx,cy:by,r:8.5,fill:'#263d67',stroke:'white','stroke-width':3},C);
+  txt(C,bx+(co>=0?18:-18),by+(si>0?-15:22),'B','#263d67',18,'middle','700');
+  const cardinals=[
+    {x:cx+r,y:cy,coord:'(1,0)',dx:24,dy:24,anchor:'start'},
+    {x:cx,y:cy-r,coord:'(0,1)',dx:-26,dy:-12,anchor:'end'},
+    {x:cx-r,y:cy,coord:'(-1,0)',dx:-24,dy:24,anchor:'end'},
+    {x:cx,y:cy+r,coord:'(0,-1)',dx:-28,dy:24,anchor:'end'}
+  ];
+  for(const p of cardinals){el('circle',{cx:p.x,cy:p.y,r:4.5,fill:'#304e7a'},C);txt(C,p.x+p.dx,p.y+p.dy,p.coord,'#445268',13,p.anchor,'600');}
+  const angleLabels={0:{label:'0',dx:18,dy:-14,anchor:'start'},90:{label:'π/2',dx:18,dy:-10,anchor:'start'},180:{label:'π',dx:-18,dy:-14,anchor:'end'},270:{label:'3π/2',dx:18,dy:26,anchor:'start'}};
+  for(let d of [0,90,180,270]){let q=d*pi/180,info=angleLabels[d];txt(C,cx+r*Math.cos(q)+info.dx,cy-r*Math.sin(q)+info.dy,info.label,'#c9962a',15,info.anchor,'700');}
+  txt(C,530,cy-10,'x'); txt(C,cx+12,28,'y'); txt(C,cx+10,cy+19,'O','#536078',14,'start','700');
+}
+function drawGraph(svg,fn,color,mode){
+  svg.replaceChildren();
+  let l=52,r=582,t=18,b=232,w=r-l,h=b-t,X=x=>l+x/TAU*w,Y=y=>t+(8-y)/16*h;
+  for(let v=-8;v<=8;v+=2){line(svg,l,Y(v),r,Y(v),v===0?'#77849a':'#e1e7ef',v===0?1.5:1);txt(svg,l-12,Y(v)+5,String(v),'#617087',13,'end')}
+  for(let i=0;i<=4;i++){let x=i*pi/2;line(svg,X(x),t,X(x),b,'#e9edf3');txt(svg,X(x),b+25,['0','π/2','π','3π/2','2π'][i],'#617087',13)}
+  let a=deg*pi/180,currentX=X(a),axisY=Y(0),x0=X(0);
+  el('line',{x1:x0,y1:axisY,x2:currentX,y2:axisY,stroke:'var(--orange-line-graph)','stroke-width':5,'stroke-linecap':'round'},svg);
+  const asym = mode==='sec' ? [pi/2,3*pi/2] : [0,pi,2*pi];
+  asym.forEach(ax=>line(svg,X(ax),t,X(ax),b,color,1.45,'6 5'));
+  let d='',started=false,step=TAU/1400,prev=0;
+  for(let x=0;x<=TAU+1e-9;x+=step){
+    const xx=Math.min(x,TAU), val=fn(xx);
+    const defined=Number.isFinite(val) && Math.abs(val)<7.95;
+    let crosses=false;
+    if(mode==='sec') crosses=Math.floor((xx+pi/2)/pi)!==Math.floor((prev+pi/2)/pi);
+    else crosses=Math.floor(xx/pi)!==Math.floor(prev/pi);
+    if(!defined||crosses){started=false;prev=xx;continue;}
+    d+=(started?'L':'M')+X(xx).toFixed(2)+' '+Y(val).toFixed(2)+' '; started=true; prev=xx;
+  }
+  el('path',{d,fill:'none',stroke:color,'stroke-width':3.2,'stroke-linecap':'round'},svg);
+  line(svg,currentX,t,currentX,b,'#8b98aa',1.4,'5 4');
+  const val=fn(a), visible=Number.isFinite(val)&&Math.abs(val)<7.95;
+  if(visible){ line(svg,l,Y(val),currentX,Y(val),color,1.4,'5 4'); el('circle',{cx:currentX,cy:Y(val),r:7,fill:color,stroke:'white','stroke-width':2.5},svg); }
+  else txt(svg,r-6,t+16,'non definita',color,12,'end','700');
+}
+function update(){
+  drawCircle(); drawGraph(S,x=>1/Math.cos(x),'#7a4cc2','sec'); drawGraph(K,x=>1/Math.sin(x),'#198a7b','csc');
+  let a=deg*pi/180, sec=1/Math.cos(a), csc=1/Math.sin(a);
+  document.getElementById('angle').textContent='x = '+fmt(a)+' rad';
+  document.getElementById('secv').textContent='sec(x) = '+(Number.isFinite(sec)?fmt(sec):'non definita');
+  document.getElementById('cscv').textContent='csc(x) = '+(Number.isFinite(csc)?fmt(csc):'non definita');
+  document.getElementById('degrees').textContent=deg.toFixed(1)+'°';
+  document.getElementById('slider').value=deg;
+}
+function setDeg(v){deg=((v%360)+360)%360;update()}
+let drag=false; function point(e){let rect=C.getBoundingClientRect(),x=(e.clientX-rect.left)*560/rect.width-255,y=235-(e.clientY-rect.top)*470/rect.height;setDeg(Math.atan2(y,x)*180/pi)}
+C.addEventListener('pointerdown',e=>{drag=true;C.setPointerCapture(e.pointerId);point(e)}); C.addEventListener('pointermove',e=>{if(drag)point(e)}); C.addEventListener('pointerup',()=>drag=false); C.addEventListener('pointercancel',()=>drag=false);
+document.getElementById('slider').addEventListener('input',e=>setDeg(+e.target.value));
+document.getElementById('construction').addEventListener('change',update);
+document.getElementById('reset').onclick=()=>{playing=false;document.getElementById('play').textContent='▶ Avvia';setDeg(45)};
+document.getElementById('play').onclick=()=>{playing=!playing;document.getElementById('play').textContent=playing?'⏸ Pausa':'▶ Avvia';last=0;if(playing)requestAnimationFrame(tick)};
+function tick(t){if(!playing)return; if(last)setDeg(deg+(t-last)*0.025); last=t; requestAnimationFrame(tick)}
+update();
+</script></body></html>
